@@ -9,8 +9,6 @@
 const int heatPin = A0;
 DS18B20  tempSensor(D2, true);
 const int MAXRETRY = 4;
-char szInfo[64];
-char hcInfo[64];
 
 bool heatOn = false;
 bool sentWarning = false;
@@ -47,11 +45,11 @@ struct HeatInfo {
 };
 
 //Averaging Variables
-int tempArray[10];
-int max;
-int maxLocation;
-int min;
-int minLocation;
+// int tempArray[10];
+// int max;
+// int maxLocation;
+// int min;
+// int minLocation;
 
 
 void setup() {
@@ -111,26 +109,28 @@ void loop() {
 
   if (heatCounter%1200 == 0) {
     float _temp;
+    int   i = 0;
 
-    _temp = tempSensor.getTemperature();
-    sprintf(hcInfo, "%f", _temp);
-    Particle.publish("count", hcInfo, PRIVATE);
-    if ( _temp > -10 && _temp < 38) {
+    do {
+      _temp = tempSensor.getTemperature();
+    } while (!tempSensor.crcCheck() && MAXRETRY > i++);
+
+    if (i < MAXRETRY) {
+      if ( _temp > -10 && _temp < 38) {
       int thisTempF = tempSensor.convertToFahrenheit(_temp);
       avgTemp += thisTempF;
       avgCounter += 1; 
+    }
+    } else {
+      Serial.println("Invalid reading");
     }
 
       
   }
   heatCounter += 1;
-  Serial.println(avgCounter);
   if (avgCounter == 10) {
                     
     int tempReading = avgTemp/10;
-
-    sprintf(szInfo, "%i", tempReading);
-    Particle.publish("dsTmp", szInfo, PRIVATE);
 
     if (tempReading != currentTemp) {
       currentTemp = tempReading;
