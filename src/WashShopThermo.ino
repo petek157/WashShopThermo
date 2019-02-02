@@ -62,6 +62,7 @@ void setup() {
   Particle.variable("heatOn", heatOn);
   Particle.variable("currentTemp", currentTemp);
   Particle.variable("tempOffset", tempOffset);
+  Particle.variable("reset", resetCount);
 
   Particle.function("setHeatMode", setMode);
   Particle.function("setHighPoint", setHigh);
@@ -117,7 +118,7 @@ void loop() {
 
     if (i < MAXRETRY) {
       if ( _temp > -10 && _temp < 38) {
-        int thisTempF = tempSensor.convertToFahrenheit(_temp);
+        int thisTempF = tempSensor.convertToFahrenheit(_temp) + tempOffset;
         avgTemp += thisTempF;
         avgCounter += 1; 
       }
