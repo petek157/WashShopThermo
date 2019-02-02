@@ -117,10 +117,10 @@ void loop() {
 
     if (i < MAXRETRY) {
       if ( _temp > -10 && _temp < 38) {
-      int thisTempF = tempSensor.convertToFahrenheit(_temp);
-      avgTemp += thisTempF;
-      avgCounter += 1; 
-    }
+        int thisTempF = tempSensor.convertToFahrenheit(_temp);
+        avgTemp += thisTempF;
+        avgCounter += 1; 
+      }
     } else {
       Serial.println("Invalid reading");
     }
