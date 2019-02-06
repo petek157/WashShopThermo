@@ -367,12 +367,18 @@ int resetReset(String set) {
 //Eventually validate that the String being sent is in fact an int
 int setHigh(String temp) {
   highSetPoint = temp.toInt();
+  if (heatMode == 2) {
+    setPoint = highSetPoint;
+  }
   writeLog();
   return 1;
 }
 
 int setLow(String temp) {
   lowSetPoint = temp.toInt();
+  if (heatMode == 1) {
+    setPoint = lowSetPoint;
+  }
   writeLog();
   return 1;
 }
