@@ -15,10 +15,10 @@ bool sentWarning = false;
 /*
  * heatMode
  * 0 = Off
- * 1 = Low Set Point
- * 2 = High Set Point
+ * 1 = Low Set Point to prevent freezing
+ * 2 = High Set Point temp for when your working in the building
  */
-int heatMode = 0; 
+int heatMode = 1; 
 
 int highSetPoint;
 int lowSetPoint;
