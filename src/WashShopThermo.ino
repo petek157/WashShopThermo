@@ -207,10 +207,6 @@ void loop() {
     runningCount = 0;
     
   }
-    
-  
-
-  //toggleColor();
 
   // if (heatOn) {
   //   unsigned long currentMillis = millis();
@@ -219,7 +215,6 @@ void loop() {
   //     lastMillis = currentMillis;
   //     switch (led_state) {
   //       case FADING_IN:
-  //         Serial.println("*--- Fade In");
   //         if ((cLEDValue + ledSteps) > 255) {
   //           cLEDValue = 255;
   //         } else {
@@ -244,7 +239,6 @@ void loop() {
   //         break;
 
   //       case FADING_OUT:
-  //         Serial.println("*--- Fade Out");
   //         if ((cLEDValue - ledSteps) < 1) {
   //           cLEDValue = 0;
   //         } else {
@@ -361,7 +355,7 @@ void checkToHeat() {
     }
 
   }
-  
+
 }
 
 void writeLog() {
