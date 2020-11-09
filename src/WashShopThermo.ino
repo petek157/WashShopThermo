@@ -20,27 +20,28 @@ bool sentWarning = false;
  */
 int heatMode = 1; 
 
-int highSetPoint;
-int lowSetPoint;
+int highSetPoint = 65;
+int lowSetPoint = 45;
 
 int setPoint;
-int tempOffset;
+int tempOffset = 0;
 int currentTemp;
+int tempFloat = 3;
 
 int resetCount = 0;
 
-int heatCounter = 0;
-int avgCounter = 0;
-int avgTemp = 0;
+float currentTempReading = 0;
+int runningTotal = 0;
+int runningCount = 0;
 
 int hAddr = 10;
 struct HeatInfo {
   uint8_t version;
   int highSet;
   int lowSet;
+  int tempFlt;
   int offset;
   int mode;
-  bool status;
   int resetCount;
 };
 
@@ -49,15 +50,20 @@ int greenPin = D8;
 int bluePin = D4;
 
 //Start Value
-static enum { RED, BLUE } cColor;
+static enum { RED, BLUE, NONE } cColor;
 
 //Current LED Value
 int cLEDValue = 0;
+// int ledSteps = 25;
 
-int ledSteps = 25;
+unsigned long lastMillisToCheck = 0;
+unsigned long delayMillisToCheck = 1000*60*3; //Check to light every 3 minutes
 
-unsigned long lastMillis = 0;
-unsigned long delayMillis = 80;
+unsigned long lastMillisToRecord = 0;
+unsigned long delayMillisToRecord = 1000*10; //Make a record every 10 seconds
+
+// unsigned long lastMillis = 0;
+// unsigned long delayMillis = 80;
 static enum { FADING_IN, FADING_OUT } led_state;
 
 int buttonPin = A1;
@@ -67,28 +73,30 @@ unsigned long lastDebounceTime = 0;
 unsigned long debounceDelay = 50;
 
 void setup() {
-  Serial.begin();
-  Serial.println("Hello World!");
 
   Particle.variable("highSetPt", highSetPoint);
   Particle.variable("lowSetPt", lowSetPoint);
+  Particle.variable("setPoint", setPoint);
   Particle.variable("heatMode", heatMode);
   Particle.variable("heatOn", heatOn);
   Particle.variable("currentTemp", currentTemp);
   Particle.variable("tempOffset", tempOffset);
+  Particle.variable("tempFloat", tempFloat);
   Particle.variable("reset", resetCount);
 
-  Particle.variable("steps", ledSteps);
-  Particle.variable("delay", delayMillis);
+  // Particle.variable("steps", ledSteps);
+  // Particle.variable("delay", delayMillis);
 
   Particle.function("setHeatMode", setMode);
   Particle.function("setHighPoint", setHigh);
   Particle.function("setLowPoint", setLow);
   Particle.function("setOffset", setOffset);
+  Particle.function("setTempFloat", setFloat);
+
   Particle.function("rsetreset", resetReset);
 
-  Particle.function("steps", setLedSteps);
-  Particle.function("delay", setdelay);
+  // Particle.function("steps", setLedSteps);
+  // Particle.function("delay", setdelay);
 
   pinMode(redPin, OUTPUT);
   pinMode(greenPin, OUTPUT);
@@ -99,19 +107,24 @@ void setup() {
   pinMode(heatPin, OUTPUT);
   digitalWrite(heatPin, LOW);
   heatOn = false;
-  heatMode = 0;
+  heatMode = 1;
+  setPoint = lowSetPoint;
 
+  setColor(0, 0, 0); // none
+
+  //EEPROM.clear();
   HeatInfo myObj;
   EEPROM.get(hAddr, myObj);
   if(myObj.version != 0) {
     // EEPROM was empty -> initialize myObj
-    HeatInfo defaultObj = { 0, highSetPoint, lowSetPoint, tempOffset, heatMode, heatOn, resetCount};
+    HeatInfo defaultObj = { 0, highSetPoint, lowSetPoint, tempFloat, tempOffset, heatMode, resetCount};
     myObj = defaultObj;
     EEPROM.put(hAddr, myObj);
-    setColor(0, 255, 0); // green
+    setColor(0, 0, 255); // blue
   } else {
     highSetPoint = myObj.highSet;
     lowSetPoint = myObj.lowSet;
+    tempFloat = myObj.tempFlt;
     tempOffset = myObj.offset;
     heatMode = myObj.mode;
     if (heatMode == 1) {
@@ -120,10 +133,12 @@ void setup() {
     } else if (heatMode == 2) {
       setPoint = highSetPoint;
       setColor(255, 0, 0); // red
+    } else {
+      setPoint = 0;
+      setColor(0, 0, 0); // none
     }
-    heatOn = myObj.status;
     resetCount = myObj.resetCount + 1;
-    HeatInfo defaultObj = { 0, highSetPoint, lowSetPoint, tempOffset, heatMode, heatOn, resetCount};
+    HeatInfo defaultObj = { 0, highSetPoint, lowSetPoint, tempFloat, tempOffset, heatMode, resetCount};
     myObj = defaultObj;
     EEPROM.put(hAddr, myObj);
   }
@@ -137,70 +152,128 @@ void loop() {
    * - actually hook into heater board to check if they fire
    */
 
-  //toggleColor();
+  unsigned long currentMillis = millis();
 
-  if (heatOn) {
-    unsigned long currentMillis = millis();
+  //If the millis turn over back to zero reset lastmillis
+  if (currentMillis < lastMillisToCheck) {
+    lastMillisToCheck = 0;
+  }
+  if (currentMillis < lastMillisToRecord) {
+    lastMillisToRecord = 0;
+  }
 
-  if ((currentMillis - lastMillis) > delayMillis) {
-    lastMillis = currentMillis;
-    switch (led_state) {
-      case FADING_IN:
-        Serial.println("*--- Fade In");
-        if ((cLEDValue + ledSteps) > 255) {
-          cLEDValue = 255;
-        } else {
-          cLEDValue = cLEDValue + ledSteps;
-        }
+  //Check to make a recording
+  if (lastMillisToRecord == 0 || (currentMillis - lastMillisToRecord) > delayMillisToRecord) {
+    lastMillisToRecord = currentMillis;
 
-        switch (cColor) {
-          case RED:
-            fadeColor(cLEDValue, 0, 0);
-            break;
-          case BLUE:
-            fadeColor(0, 0, cLEDValue);
-            break;
-          default:
-            break;
-        }
+    currentTempReading = tempSensor.getTemperature();
 
-        if (cLEDValue == 255) {
-          led_state = FADING_OUT;
-          break;
-        }
-        break;
-
-      case FADING_OUT:
-        Serial.println("*--- Fade Out");
-        if ((cLEDValue - ledSteps) < 1) {
-          cLEDValue = 0;
-        } else {
-          cLEDValue = cLEDValue - ledSteps;
-        }
-
-        switch (cColor) {
-          case RED:
-            fadeColor(cLEDValue, 0, 0);
-            break;
-          case BLUE:
-            fadeColor(0, 0, cLEDValue);
-            break;
-          default:
-            break;
-        }
-
-        if (cLEDValue == 0) {
-          led_state = FADING_IN;
-          break;
-        }
-        break;
-      default:
-      return;
+    if (tempSensor.crcCheck()) {
+      
+      if ( currentTempReading > -10 && currentTempReading < 38) {
+        int thisTempF = tempSensor.convertToFahrenheit(currentTempReading) + tempOffset;
+        
+        runningTotal = runningTotal + thisTempF;
+        runningCount++;
+      }
     }
+  }
+
+  //Calculate the average of the recordings to see if we should turn on the heat
+  if ((currentMillis - lastMillisToCheck) > delayMillisToCheck) {
+    lastMillisToCheck = currentMillis;
+    currentTemp = runningTotal/runningCount;
+
+    if (heatMode == 0) {
+      if (currentTemp < 40) {          
+        if (sentWarning == false) {
+          /*
+          * Send alert to owner via text saying 
+          * "Temp is %temp in garage! Would you like me to turn the heat to the low set point?"
+          * responsing "Yes" to text will turn on the heat to the low setpoint
+          */
+          bool success;
+          success = Particle.publish("below-40", PRIVATE); //Setup to send text message to me
+          if (success) {
+            sentWarning = true;
+          } 
+        }
+      }
+    } else {
+      checkToHeat();
+    }
+
+    runningTotal = 0;
+    runningCount = 0;
     
   }
+    
+  
 
-  }
+  //toggleColor();
+
+  // if (heatOn) {
+  //   unsigned long currentMillis = millis();
+
+  //   if ((currentMillis - lastMillis) > delayMillis) {
+  //     lastMillis = currentMillis;
+  //     switch (led_state) {
+  //       case FADING_IN:
+  //         Serial.println("*--- Fade In");
+  //         if ((cLEDValue + ledSteps) > 255) {
+  //           cLEDValue = 255;
+  //         } else {
+  //           cLEDValue = cLEDValue + ledSteps;
+  //         }
+
+  //         switch (cColor) {
+  //           case RED:
+  //             fadeColor(cLEDValue, 0, 0);
+  //             break;
+  //           case BLUE:
+  //             fadeColor(0, 0, cLEDValue);
+  //             break;
+  //           default:
+  //             break;
+  //         }
+
+  //         if (cLEDValue == 255) {
+  //           led_state = FADING_OUT;
+  //           break;
+  //         }
+  //         break;
+
+  //       case FADING_OUT:
+  //         Serial.println("*--- Fade Out");
+  //         if ((cLEDValue - ledSteps) < 1) {
+  //           cLEDValue = 0;
+  //         } else {
+  //           cLEDValue = cLEDValue - ledSteps;
+  //         }
+
+  //         switch (cColor) {
+  //           case RED:
+  //             fadeColor(cLEDValue, 0, 0);
+  //             break;
+  //           case BLUE:
+  //             fadeColor(0, 0, cLEDValue);
+  //             break;
+  //           default:
+  //             break;
+  //         }
+
+  //         if (cLEDValue == 0) {
+  //           led_state = FADING_IN;
+  //           break;
+  //         }
+  //         break;
+  //       default:
+  //       return;
+  //     }
+      
+  //   }
+
+  // }
 
   int reading = digitalRead(buttonPin);
   if (reading != lastButtonState) {
@@ -214,7 +287,6 @@ void loop() {
     // if the button state has changed:
     if (reading != buttonState) {
       buttonState = reading;
-      Serial.print("*--- Button ---* "); Serial.println(buttonState);
       if (buttonState == LOW) {
         if (heatMode == 0) {
           setMode("1");
@@ -228,76 +300,14 @@ void loop() {
   }
   lastButtonState = reading;
 
-  if (heatCounter%1200 == 0) {
-    float _temp;
-    // int   i = 0;
-
-    // do {
-    //   _temp = tempSensor.getTemperature();
-    // } while (!tempSensor.crcCheck() && MAXRETRY > i++);
-    _temp = tempSensor.getTemperature();
-    if (tempSensor.crcCheck()) {
-      
-      if ( _temp > -10 && _temp < 38) {
-        int thisTempF = tempSensor.convertToFahrenheit(_temp) + tempOffset;
-        
-        avgTemp += thisTempF;
-        avgCounter += 1; 
-      }
-    }
-
-    if (avgCounter == 10) {
-                    
-      int tempReading = avgTemp/10;
-      
-      if (tempReading != currentTemp) {
-        currentTemp = tempReading;
-
-        if (heatMode == 0) {
-          if (currentTemp < 40) {
-          
-            if (sentWarning == false) {
-              /*
-              * Send alert to owner via text saying 
-              * "Temp is %temp in garage! Would you like me to turn the heat to the low set point?"
-              * responsing "Yes" to text will turn on the heat to the low setpoint
-              */
-              bool success;
-              success = Particle.publish("below-40", PRIVATE); //Setup to send text message to me
-              if (success) {
-                sentWarning = true;
-              } 
-            }
-            
-          }
-        } else {
-          checkToHeat();
-        }
-
-        avgTemp = 0;
-        avgCounter = 0;
-        heatCounter = 0;
-      }
-    }
-
-    if (avgCounter > 10) {
-      avgTemp = 0;
-      avgCounter = 0;
-      heatCounter = 0;
-    }
-
-  }
-  heatCounter += 1;
-
 }
 
 int setMode(String mode) {
-  Serial.print("Mode: "); Serial.println(mode);
   if(mode == "0") {
     digitalWrite(heatPin, LOW);
     heatOn = false;
     heatMode = 0;
-    setColor(0, 255, 0); // green
+    setColor(0, 0, 0); // no color
     writeLog();
     return 1;
   } else if (mode == "1") {
@@ -338,7 +348,7 @@ void checkToHeat() {
       }
     }
 
-    if (currentTemp < setPoint - 3) {//Turn On
+    if (currentTemp < setPoint - tempFloat) {//Turn On
       if (heatOn == false) {
         digitalWrite(heatPin, HIGH);
         heatOn = true;
@@ -351,6 +361,7 @@ void checkToHeat() {
     }
 
   }
+  
 }
 
 void writeLog() {
@@ -389,12 +400,20 @@ int setOffset(String newOffset) {
   return 1;
 }
 
+int setFloat(String newFloat) {
+  tempFloat = newFloat.toInt();
+  writeLog();
+  return 1;
+}
+
 void setColor(int red, int green, int blue) {
 
   if (red == 255) {
     cColor = RED;
   } else if (blue == 255) {
     cColor = BLUE;
+  } else {
+    cColor = NONE;
   }
 
   cLEDValue = 255;
@@ -403,31 +422,28 @@ void setColor(int red, int green, int blue) {
   green = 255 - green;
   blue = 255 - blue;
 
-  Serial.println("Set");
-  Serial.print(red); Serial.print(", "); Serial.print(green); Serial.print(", "); Serial.println(blue);
-
   analogWrite(redPin, red); analogWrite(greenPin, green); analogWrite(bluePin, blue);
 }
 
-void fadeColor(int red, int green, int blue) {
+// void fadeColor(int red, int green, int blue) {
 
-  red = 255 - red;
-  green = 255 - green;
-  blue = 255 - blue;
+//   red = 255 - red;
+//   green = 255 - green;
+//   blue = 255 - blue;
 
-  Serial.println("Fade");
-  Serial.print(red); Serial.print(", "); Serial.print(green); Serial.print(", "); Serial.println(blue);
+//   Serial.println("Fade");
+//   Serial.print(red); Serial.print(", "); Serial.print(green); Serial.print(", "); Serial.println(blue);
 
-  analogWrite(redPin, red); analogWrite(greenPin, green); analogWrite(bluePin, blue);
-}
+//   analogWrite(redPin, red); analogWrite(greenPin, green); analogWrite(bluePin, blue);
+// }
 
-int setLedSteps(String steps) {
-  ledSteps = steps.toInt();
-  return 1;
-}
+// int setLedSteps(String steps) {
+//   ledSteps = steps.toInt();
+//   return 1;
+// }
 
-int setdelay(String delay) {
-  unsigned long newLong = delay.toInt();
-  delayMillis = newLong;
-  return 1;
-}
+// int setdelay(String delay) {
+//   unsigned long newLong = delay.toInt();
+//   delayMillis = newLong;
+//   return 1;
+// }

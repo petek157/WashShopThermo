@@ -4,8 +4,8 @@
     "files.associations": {
         "*.ino": "cpp"
     },
-    "particle.targetDevice": "washShop_thermo",
+    "particle.targetDevice": "storeTester",
     "particle.firmwareVersion": "1.5.2",
-    "particle.targetPlatform": "xenon",
+    "particle.targetPlatform": "argon",
     "cortex-debug.openocdPath": "${command:particle.getDebuggerOpenocdPath}"
 }
