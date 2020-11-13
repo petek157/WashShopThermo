@@ -54,16 +54,17 @@ static enum { RED, BLUE, NONE } cColor;
 
 //Current LED Value
 int cLEDValue = 0;
-// int ledSteps = 25;
+int ledSteps = 25;
 
 unsigned long lastMillisToCheck = 0;
-unsigned long delayMillisToCheck = 1000*60*3; //Check to light every 3 minutes
+unsigned long delayMillisToCheck = 1000*60*3; //Check to heat every 3 minutes
 
 unsigned long lastMillisToRecord = 0;
 unsigned long delayMillisToRecord = 1000*10; //Make a record every 10 seconds
 
-// unsigned long lastMillis = 0;
-// unsigned long delayMillis = 80;
+unsigned long lastMillis = 0;
+unsigned long delayMillis = 80;
+
 static enum { FADING_IN, FADING_OUT } led_state;
 
 int buttonPin = A1;
@@ -205,69 +206,68 @@ void loop() {
 
     runningTotal = 0;
     runningCount = 0;
-    
   }
 
-  // if (heatOn) {
-  //   unsigned long currentMillis = millis();
+  if (heatOn) {
+    unsigned long currentMillis = millis();
 
-  //   if ((currentMillis - lastMillis) > delayMillis) {
-  //     lastMillis = currentMillis;
-  //     switch (led_state) {
-  //       case FADING_IN:
-  //         if ((cLEDValue + ledSteps) > 255) {
-  //           cLEDValue = 255;
-  //         } else {
-  //           cLEDValue = cLEDValue + ledSteps;
-  //         }
+    if ((currentMillis - lastMillis) > delayMillis) {
+      lastMillis = currentMillis;
+      switch (led_state) {
+        case FADING_IN:
+          if ((cLEDValue + ledSteps) > 255) {
+            cLEDValue = 255;
+          } else {
+            cLEDValue = cLEDValue + ledSteps;
+          }
 
-  //         switch (cColor) {
-  //           case RED:
-  //             fadeColor(cLEDValue, 0, 0);
-  //             break;
-  //           case BLUE:
-  //             fadeColor(0, 0, cLEDValue);
-  //             break;
-  //           default:
-  //             break;
-  //         }
+          switch (cColor) {
+            case RED:
+              fadeColor(cLEDValue, 0, 0);
+              break;
+            case BLUE:
+              fadeColor(0, 0, cLEDValue);
+              break;
+            default:
+              break;
+          }
 
-  //         if (cLEDValue == 255) {
-  //           led_state = FADING_OUT;
-  //           break;
-  //         }
-  //         break;
+          if (cLEDValue == 255) {
+            led_state = FADING_OUT;
+            break;
+          }
+          break;
 
-  //       case FADING_OUT:
-  //         if ((cLEDValue - ledSteps) < 1) {
-  //           cLEDValue = 0;
-  //         } else {
-  //           cLEDValue = cLEDValue - ledSteps;
-  //         }
+        case FADING_OUT:
+          if ((cLEDValue - ledSteps) < 1) {
+            cLEDValue = 0;
+          } else {
+            cLEDValue = cLEDValue - ledSteps;
+          }
 
-  //         switch (cColor) {
-  //           case RED:
-  //             fadeColor(cLEDValue, 0, 0);
-  //             break;
-  //           case BLUE:
-  //             fadeColor(0, 0, cLEDValue);
-  //             break;
-  //           default:
-  //             break;
-  //         }
+          switch (cColor) {
+            case RED:
+              fadeColor(cLEDValue, 0, 0);
+              break;
+            case BLUE:
+              fadeColor(0, 0, cLEDValue);
+              break;
+            default:
+              break;
+          }
 
-  //         if (cLEDValue == 0) {
-  //           led_state = FADING_IN;
-  //           break;
-  //         }
-  //         break;
-  //       default:
-  //       return;
-  //     }
+          if (cLEDValue == 0) {
+            led_state = FADING_IN;
+            break;
+          }
+          break;
+        default:
+        return;
+      }
       
-  //   }
+    }
 
-  // }
+  }
 
   int reading = digitalRead(buttonPin);
   if (reading != lastButtonState) {
@@ -419,17 +419,14 @@ void setColor(int red, int green, int blue) {
   analogWrite(redPin, red); analogWrite(greenPin, green); analogWrite(bluePin, blue);
 }
 
-// void fadeColor(int red, int green, int blue) {
+void fadeColor(int red, int green, int blue) {
 
-//   red = 255 - red;
-//   green = 255 - green;
-//   blue = 255 - blue;
+  red = 255 - red;
+  green = 255 - green;
+  blue = 255 - blue;
 
-//   Serial.println("Fade");
-//   Serial.print(red); Serial.print(", "); Serial.print(green); Serial.print(", "); Serial.println(blue);
-
-//   analogWrite(redPin, red); analogWrite(greenPin, green); analogWrite(bluePin, blue);
-// }
+  analogWrite(redPin, red); analogWrite(greenPin, green); analogWrite(bluePin, blue);
+}
 
 // int setLedSteps(String steps) {
 //   ledSteps = steps.toInt();
