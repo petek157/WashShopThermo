@@ -6,7 +6,7 @@
  */
 #include <DS18B20.h>
 
-const int heatPin = A0;
+const int heatPin = A5;
 DS18B20  tempSensor(D2, true);
 const int MAXRETRY = 4;
 
@@ -20,7 +20,7 @@ bool sentWarning = false;
  */
 int heatMode = 1; 
 
-int highSetPoint = 65;
+int highSetPoint = 60;
 int lowSetPoint = 45;
 
 int setPoint;
@@ -45,7 +45,7 @@ struct HeatInfo {
   int resetCount;
 };
 
-int redPin = A3;
+int redPin = A1;
 int greenPin = D8;
 int bluePin = D4;
 
@@ -57,7 +57,7 @@ int cLEDValue = 0;
 int ledSteps = 25;
 
 unsigned long lastMillisToCheck = 0;
-unsigned long delayMillisToCheck = 1000*60*3; //Check to heat every 3 minutes
+unsigned long delayMillisToCheck = 1000*60*1; //Check to heat every 1 minutes
 
 unsigned long lastMillisToRecord = 0;
 unsigned long delayMillisToRecord = 1000*10; //Make a record every 10 seconds
@@ -67,13 +67,19 @@ unsigned long delayMillis = 80;
 
 static enum { FADING_IN, FADING_OUT } led_state;
 
-int buttonPin = A1;
+int buttonPin = A3;
 int buttonState;
 int lastButtonState = HIGH;
 unsigned long lastDebounceTime = 0;
 unsigned long debounceDelay = 50;
 
+ApplicationWatchdog wd(60000, System.reset);
+SYSTEM_THREAD(ENABLED);
 void setup() {
+
+  WiFi.setCredentials("GLF", "abcdef1234");
+  WiFi.setCredentials("IHV", "abcdef1234");
+  WiFi.setCredentials("PKShopNet", "abcdef1234");
 
   Particle.variable("highSetPt", highSetPoint);
   Particle.variable("lowSetPt", lowSetPoint);
@@ -359,7 +365,7 @@ void checkToHeat() {
 }
 
 void writeLog() {
-  HeatInfo defaultObj = { 0, highSetPoint, lowSetPoint, tempOffset, heatMode, heatOn, resetCount};
+  HeatInfo defaultObj = { 0, highSetPoint, lowSetPoint, tempFloat, tempOffset, heatMode, resetCount};
   EEPROM.put(hAddr, defaultObj);
 }
 
